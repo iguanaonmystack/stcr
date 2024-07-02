@@ -6,7 +6,7 @@ from flask_discord import DiscordOAuth2Session, requires_authorization, Unauthor
 
 app = Flask(__name__)
 
-exec(open('secrets.py').read())  #provides `config`
+exec(open(os.path.dirname(__file__) + '/../secrets.py').read())  # provides `config`
 
 app.secret_key = config['flask_secret_key']
 # OAuth2 must make use of HTTPS in production environment.
@@ -14,17 +14,11 @@ app.secret_key = config['flask_secret_key']
 
 app.config["DISCORD_CLIENT_ID"] = config['client_id']    # Discord client ID.
 app.config["DISCORD_CLIENT_SECRET"] = config['client_secret']                # Discord client secret.
-app.config["DISCORD_REDIRECT_URI"] = "https://stcr.nevira.net/auth/discord-redirect"                 # URL to your callback endpoint.
+app.config["DISCORD_REDIRECT_URI"] = "https://stcr.nevira.net/app/auth/discord-redirect"                 # URL to your callback endpoint.
 app.config["DISCORD_BOT_TOKEN"] = ""                    # Required to access BOT resources.
 
 
 discord = DiscordOAuth2Session(app)
-
-def welcome_user(user):
-    dm_channel = discord.bot_request("/users/@me/channels", "POST", json={"recipient_id": user.id})
-    return discord.bot_request(
-        f"/channels/{dm_channel['id']}/messages", "POST", json={"content": "Thanks for authorizing the app!"}
-    )
 
 @app.route("/auth/discord-login/")
 def login():
@@ -35,7 +29,7 @@ def login():
 def callback():
     discord.callback()
     user = discord.fetch_user()
-    welcome_user(user)
+    #welcome_user(user)
     return redirect(url_for(".me"))
 
 
@@ -44,7 +38,7 @@ def redirect_unauthorized(e):
     return redirect(url_for("login"))
 
 
-@app.route("/me/")
+@app.route("/")
 @requires_authorization
 def me():
     user = discord.fetch_user()
@@ -55,7 +49,7 @@ def me():
         </head>
         <body>
             <img src='{user.avatar_url}' />
-            <pre>{user}</pre>
+            <pre>{user.email}</pre>
         </body>
     </html>"""
 
