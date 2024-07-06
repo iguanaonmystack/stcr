@@ -1,4 +1,5 @@
 import os
+import sqlite3
 
 from flask import Flask, redirect, url_for
 from flask import render_template
@@ -17,6 +18,11 @@ app.config["DISCORD_CLIENT_SECRET"] = config['client_secret']                # D
 app.config["DISCORD_REDIRECT_URI"] = "https://stcr.nevira.net/app/auth/discord-redirect"                 # URL to your callback endpoint.
 app.config["DISCORD_BOT_TOKEN"] = ""                    # Required to access BOT resources.
 
+
+def get_db_connection():
+    conn = sqlite3.connect('/var/lib/stcr/src/database.db')
+    conn.row_factory = sqlite3.Row
+    return conn
 
 discord = DiscordOAuth2Session(app)
 
@@ -41,17 +47,37 @@ def redirect_unauthorized(e):
 @app.route("/")
 @requires_authorization
 def me():
-    user = discord.fetch_user()
-    return f"""
-    <html>
-        <head>
-            <title>{user.name}</title>
-        </head>
-        <body>
-            <img src='{user.avatar_url}' />
-            <pre>{user.email}</pre>
-        </body>
-    </html>"""
+    discord_user = discord.fetch_user()
+
+    conn = get_db_connection()
+    db_user = None
+    while db_user is None:
+        db_user = conn.execute(
+                'SELECT u.* '
+                ', pc.page as pc_page'
+                ', pc.panel as pc_panel'
+                ', p1.page as p1_page'
+                ', p1.panel as p1_panel'
+                ', p2.page as p2_page'
+                ', p2.panel as p2_panel'
+                ', p3.page as p3_page'
+                ', p3.panel as p3_panel'
+                ' FROM users u '
+                '  LEFT JOIN panels pc ON pc.id = u.confirmed_choice '
+                '  LEFT JOIN panels p1 ON p1.id = u.first_choice '
+                '  LEFT JOIN panels p2 ON p1.id = u.second_choice '
+                '  LEFT JOIN panels p3 ON p1.id = u.third_choice '
+                ' WHERE discord_username = (?)'
+                , (discord_user.name,)).fetchone()
+        if db_user is None:
+            db_user = conn.execute(
+                'INSERT INTO users (discord_user, is_admin) VALUES (?,?)',
+                (discord_user.name, False))
+    conn.close()
+
+    return render_template('me.html',
+            discord_user=discord_user,
+            db_user=db_user)
 
 
 if __name__ == "__main__":
