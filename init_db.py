@@ -10,8 +10,8 @@ cur = connection.cursor()
 
 for page in range(1, 8):
     for panel in range(1, 6):
-        cur.execute("INSERT INTO panels (page, panel) VALUES (?, ?)",
-                    (page, panel)
+        cur.execute("INSERT INTO panels (issue, page, panel) VALUES (?, ?, ?)",
+                    (4, page, panel)
                     )
 
 cur.execute("INSERT INTO users (discord_username, is_admin) VALUES (?, ?)",

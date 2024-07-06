@@ -63,10 +63,10 @@ def me():
                 ', p3.page as p3_page'
                 ', p3.panel as p3_panel'
                 ' FROM users u '
-                '  LEFT JOIN panels pc ON pc.id = u.confirmed_choice '
-                '  LEFT JOIN panels p1 ON p1.id = u.first_choice '
-                '  LEFT JOIN panels p2 ON p1.id = u.second_choice '
-                '  LEFT JOIN panels p3 ON p1.id = u.third_choice '
+                '  LEFT JOIN panels pc ON pc.id = u.confirmed_choice AND pc.issue = 4 '
+                '  LEFT JOIN panels p1 ON p1.id = u.first_choice AND p1.issue = 4 '
+                '  LEFT JOIN panels p2 ON p2.id = u.second_choice AND p2.issue = 4 '
+                '  LEFT JOIN panels p3 ON p3.id = u.third_choice AND p3.issue = 4 '
                 ' WHERE discord_username = (?)'
                 , (discord_user.name,)).fetchone()
         if db_user is None:
