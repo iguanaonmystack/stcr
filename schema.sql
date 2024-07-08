@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS panels;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS choices;
 
 CREATE TABLE panels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14,10 +15,21 @@ CREATE TABLE users (
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     discord_username TEXT NOT NULL,
     is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    confirmed_choice INTEGER UNIQUE,
+    FOREIGN KEY(confirmed_choice) REFERENCES panels(id)
+);
+
+CREATE TABLE choices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    from_user INTEGER UNIQUE,
     first_choice INTEGER,
     second_choice INTEGER,
     third_choice INTEGER,
-    status TEXT CHECK(status IN ('READY', 'TO_PROCESS', 'FIXED')) NOT NULL DEFAULT 'READY', -- READY - confirmed_choice is ready to be chosen; TO_PROCESS - user has submitted the selection form, automated process needs to run; FIXED - confirmed_choice is final.
-    confirmed_choice INTEGER UNIQUE,
-    FOREIGN KEY(confirmed_choice) REFERENCES panels(id)
+    status TEXT CHECK(status IN ('PENDING', 'PROCESSED')) NOT NULL DEFAULT 'PENDING',
+
+    FOREIGN KEY(from_user) REFERENCES users(id),
+    FOREIGN KEY(first_choice) REFERENCES panels(id),
+    FOREIGN KEY(second_choice) REFERENCES panels(id),
+    FOREIGN KEY(third_choice) REFERENCES panels(id)
 );

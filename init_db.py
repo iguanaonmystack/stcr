@@ -18,6 +18,5 @@ cur.execute("INSERT INTO users (discord_username, is_admin) VALUES (?, ?)",
             ('kapellosaur', True)
             )
 
-
 connection.commit()
 connection.close()

@@ -9,6 +9,44 @@
 	<pre>{{db_user.keys()}}</pre>
 
 	{{dict(db_user)}}
+
+	{% if db_user.confirmed_choice %}
+	<p>You have been allocated Page {{db_user.pc_page}}, Panel {{db_user.pc_panel}}!</p>
+	{% elif db_user.status == "PENDING" %}
+	<p>We are curently processing your panel choice, try refreshing this page in a few moments!</p>
+	{% else %}
+	<form method="POST" action="{{url_for('.allocate')}}">
+		<p>Choose the panel you want to draw. Panels are allocated in the order they were requested. In case someone else has taken your first choice of panel between this page loading and you submitting the form, you can also choose a second (and third) choice if you wish.</p>
+		<p>
+		First choice:
+		<select name="first_choice">
+			<option value="">-</option>
+			{% for panel in available_panels %}
+			<option value="{{panel.page}}-{{panel.panel}}">Page {{panel.page}} - Panel {{panel.panel}}</option>
+			{% endfor %}
+		</select>
+		</p>
+		<p>
+		Second choice:
+		<select name="second_choice">
+			<option value="">-</option>
+			{% for panel in available_panels %}
+			<option value="{{panel.page}}-{{panel.panel}}">Page {{panel.page}} - Panel {{panel.panel}}</option>
+			{% endfor %}
+		</select>
+		</p>
+		<p>
+		Third choice:
+		<select name="third_choice">
+			<option value="">-</option>
+			{% for panel in available_panels %}
+			<option value="{{panel.page}}-{{panel.panel}}">Page {{panel.page}} - Panel {{panel.panel}}</option>
+			{% endfor %}
+		</select>
+		</p>
+		<input type="submit" />
+	</form>
+	{% endif %}
 </body>
 </html>
 
