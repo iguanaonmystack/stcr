@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+	<title>{{discord_user.name}}</title>
+	<style>
+		table { padding: 0; border-collapse: collapse; }
+		td { margin: 0; border: 1px solid grey; }
+	</style>
+</head>
+<body>
+	<img src='{{discord_user.avatar_url}}' />
+	<p>Logged in as {{discord_user.name}}</p>
+
+	<h2>Admin Queue View</h2>
+
+	<p>Queue should have no PENDING items under usual circumstances, unless you catch this page just as a user submits a panel request.</p>
+
+	<table style="width:100%;">
+		<thead>
+			<th>Status</th>
+			<th>Submitted at</th>
+			<th>User</th>
+			<th>First choice</th>
+			<th>Second choice</th>
+			<th>Third choice</th>
+			<th>Outcome</th>
+		</thead>
+		<tbody>
+	{% for item in choices %}
+	<tr style="
+	       {% if item.status == "PENDING" %}
+		background-color: #f0f0f0;
+	       {%else%}
+		background-color: #f0fff0;
+	       {%endif%}"
+	>
+		<td>{{item.status}}</td>
+		<td>{{item.created}}</td>
+		<td>{{item.discord_username}}</td>
+		<td>Issue {{item.p1_issue}}, {{item.p1_page}}-{{item.p1_panel}}</td>
+		{% if item.p2_issue %}
+		<td>Issue {{item.p2_issue}}, {{item.p2_page}}-{{item.p2_panel}}</td>
+		{%else %}
+		<td>-</td>
+		{%endif%}
+
+		{% if item.p3_issue %}
+		<td>Issue {{item.p3_issue}}, {{item.p3_page}}-{{item.p3_panel}}</td>
+		{%else%}
+		<td>-</td>
+		{%endif%}
+
+		{% if item.pc_issue %}
+		<td>Issue {{item.pc_issue}}, {{item.pc_page}}-{{item.pc_panel}}</td>
+		{%else%}
+		<td>-</td>
+		{%endif%}
+	</tr>
+	{%endfor%}
+		</tbody>
+	</table>
+
+</body>
+</html>
+

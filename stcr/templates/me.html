@@ -1,14 +1,11 @@
 <!doctype html>
 <html>
 <head>
-	<title>{{discord_user.name}}</title>
+	<title>STC: Reillustrated - {{discord_user.name}}</title>
 </head>
 <body>
 	<img src='{{discord_user.avatar_url}}' />
-	email: <pre>{{discord_user.email}}</pre>
-	<pre>{{db_user.keys()}}</pre>
-
-	{{dict(db_user)}}
+	<p>Logged in using discord as {{discord_user.name}}</p>
 
 	{% if db_user.confirmed_choice %}
 	<p>You have been allocated Page {{db_user.pc_page}}, Panel {{db_user.pc_panel}}!</p>

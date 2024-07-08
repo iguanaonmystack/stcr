@@ -22,14 +22,16 @@ CREATE TABLE users (
 CREATE TABLE choices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    from_user INTEGER UNIQUE,
+    from_user INTEGER,
     first_choice INTEGER,
     second_choice INTEGER,
     third_choice INTEGER,
     status TEXT CHECK(status IN ('PENDING', 'PROCESSED')) NOT NULL DEFAULT 'PENDING',
+    confirmed_choice INTEGER,
 
     FOREIGN KEY(from_user) REFERENCES users(id),
     FOREIGN KEY(first_choice) REFERENCES panels(id),
     FOREIGN KEY(second_choice) REFERENCES panels(id),
     FOREIGN KEY(third_choice) REFERENCES panels(id)
+    FOREIGN KEY(confirmed_choice) REFERENCES panels(id)
 );
