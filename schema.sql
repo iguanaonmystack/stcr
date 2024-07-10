@@ -16,6 +16,7 @@ CREATE TABLE users (
     discord_username TEXT NOT NULL,
     is_admin BOOLEAN NOT NULL DEFAULT FALSE,
     confirmed_choice INTEGER UNIQUE,
+    no_choices_available BOOLEAN DEFAULT FALSE,
     FOREIGN KEY(confirmed_choice) REFERENCES panels(id)
 );
 

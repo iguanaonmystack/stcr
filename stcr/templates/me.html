@@ -13,6 +13,9 @@
 	<p>We are curently processing your panel choice, try refreshing this page in a few moments!</p>
 	{% else %}
 	<form method="POST" action="{{url_for('.allocate')}}">
+		{% if db_user.no_choices_available %}
+		<p>Unfortunately none of your first set of choices were available. You can make another selection with the remaining panels.</p>
+		{% endif %}
 		<p>Choose the panel you want to draw. Panels are allocated in the order they were requested. In case someone else has taken your first choice of panel between this page loading and you submitting the form, you can also choose a second (and third) choice if you wish.</p>
 		<p>
 		First choice:

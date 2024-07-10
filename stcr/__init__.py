@@ -6,10 +6,27 @@ from flask import Flask, redirect, url_for, request
 from flask import render_template
 from flask_discord import DiscordOAuth2Session, requires_authorization, Unauthorized
 
+import rq_dashboard
+
 from . import worker
 from . import db
 
 app = Flask(__name__)
+
+app.config.from_object(rq_dashboard.default_settings)
+app.config["RQ_DASHBOARD_REDIS_URL"] = "redis://127.0.0.1:6379"
+rq_dashboard.web.setup_rq_connection(app)
+
+@rq_dashboard.blueprint.before_request
+def dashboard_auth():
+    discord_user = discord.fetch_user()
+    conn = db.get_db_connection()
+    db_user = db.get_or_create_user(conn, discord_user)
+    if not db_user['is_admin']:
+        return "Admin user login required."
+
+
+app.register_blueprint(rq_dashboard.blueprint, url_prefix="/rq")
 
 exec(open(os.path.dirname(__file__) + '/../secrets.py').read())  # provides `config`
 
@@ -107,9 +124,9 @@ def allocate():
     return redirect(url_for(".me"))
 
 
-@app.route("/force_redis")
+@app.route("/add-worker")
 @requires_authorization
-def force_redis():
+def add_worker():
     discord_user = discord.fetch_user()
     conn = db.get_db_connection()
     db_user = db.get_or_create_user(conn, discord_user)
