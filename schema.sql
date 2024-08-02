@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS panels;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS choices;
+DROP TABLE IF EXISTS allocations;
 
 CREATE TABLE panels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14,25 +15,28 @@ CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     discord_username TEXT NOT NULL,
-    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-    confirmed_choice INTEGER UNIQUE,
-    no_choices_available BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY(confirmed_choice) REFERENCES panels(id)
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE choices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    from_user INTEGER,
-    first_choice INTEGER,
-    second_choice INTEGER,
-    third_choice INTEGER,
-    status TEXT CHECK(status IN ('PENDING', 'PROCESSED')) NOT NULL DEFAULT 'PENDING',
-    confirmed_choice INTEGER,
+    user INTEGER,
+    panel INTEGER,
+    preference INTEGER, -- first, second, or third preference (1/2/3)
 
-    FOREIGN KEY(from_user) REFERENCES users(id),
-    FOREIGN KEY(first_choice) REFERENCES panels(id),
-    FOREIGN KEY(second_choice) REFERENCES panels(id),
-    FOREIGN KEY(third_choice) REFERENCES panels(id)
-    FOREIGN KEY(confirmed_choice) REFERENCES panels(id)
+    FOREIGN KEY(user) REFERENCES users(id),
+    FOREIGN KEY(panel) REFERENCES panels(id)
 );
+
+
+CREATE TABLE allocations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    user INTEGER,
+    panel INTEGER UNIQUE,  -- null if no panels available
+
+    FOREIGN KEY(user) REFERENCES users(id),
+    FOREIGN KEY(panel) REFERENCES panels(id)
+);
+

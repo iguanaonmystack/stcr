@@ -1,6 +1,8 @@
 import os
+import sys
 import time
 import sqlite3
+import datetime
 
 from flask import Flask, redirect, url_for, request
 from flask import render_template
@@ -12,6 +14,11 @@ from . import worker
 from . import db
 
 app = Flask(__name__)
+app.config.from_object('stcr.default_settings')
+try:
+    app.config.from_envvar('STCR_SETTINGS')  # path to config file.
+except RuntimeError:
+    print("No STCR_SETTINGS env var, using no custom settings file.", file=sys.stderr)
 
 app.config.from_object(rq_dashboard.default_settings)
 app.config["RQ_DASHBOARD_REDIS_URL"] = "redis://127.0.0.1:6379"
@@ -73,12 +80,29 @@ def me():
 
     conn = db.get_db_connection()
     db_user = db.get_or_create_user(conn, discord_user)
+    status = 'ALLOCATED'
+    if db_user['a_panel'] is None:
+        if db_user['aid'] is not None:
+            # they were allocated a NULL panel; ie no panels were available
+            status = 'FAILED'
+        else:
+            # Check if they have pending choices
+            choices = conn.execute(
+                'SELECT c.*, p.page as p_issue FROM choices c '
+                ' LEFT JOIN panels p ON p.id = c.panel'
+                ' WHERE user = (?) AND p_issue != 4',
+                (db_user['id'],)
+            ).fetchall()
+            if choices:
+                status = 'PENDING'
+            else:
+                status = 'NEW'
 
     available_panels = conn.execute(
         "SELECT * FROM panels p "
         " WHERE issue = 4 "
         " AND NOT EXISTS ("
-        "    SELECT * FROM users u WHERE u.confirmed_choice == p.id"
+        "    SELECT * FROM allocations a WHERE a.panel == p.id"
         " )"
     ).fetchall()
 
@@ -86,12 +110,13 @@ def me():
     return render_template('me.html',
             available_panels=list(available_panels),
             discord_user=discord_user,
+            status=status,
             db_user=db_user)
 
 
-@app.route("/allocate", methods=('POST',))
+@app.route("/choose", methods=('POST',))
 @requires_authorization
-def allocate():
+def choose():
     """Store the user's panel choices.
     
     The task queue will process whether it's valid or not later."""
@@ -100,20 +125,22 @@ def allocate():
     conn = db.get_db_connection()
     db_user = db.get_or_create_user(conn, discord_user)
 
-    first_choice = tuple(map(int, (request.form['first_choice'] or '0-0').split('-')))
-    second_choice = tuple(map(int, (request.form['second_choice'] or '0-0').split('-')))
-    third_choice = tuple(map(int, (request.form['third_choice'] or '0-0').split('-')))
+    choices = {}
+    choices[1] = tuple(map(int, (request.form['first_choice'] or '0-0').split('-')))
+    choices[2] = tuple(map(int, (request.form['second_choice'] or '0-0').split('-')))
+    choices[3] = tuple(map(int, (request.form['third_choice'] or '0-0').split('-')))
 
-    conn.execute(
-        "INSERT INTO choices (from_user, first_choice, second_choice, third_choice)"
-        "VALUES "
-        "( ?"
-        ", (SELECT id FROM panels p WHERE p.issue == 4 AND p.page = ? AND p.panel = ?)"
-        ", (SELECT id FROM panels p WHERE p.issue == 4 AND p.page = ? AND p.panel = ?)"
-        ", (SELECT id FROM panels p WHERE p.issue == 4 AND p.page = ? AND p.panel = ?)"
-        ")",
-        (db_user['id'],) + first_choice + second_choice + third_choice
-    )
+    now = datetime.datetime.now()
+    for pref, choice in choices.items():
+        conn.execute(
+            "INSERT INTO choices (created, user, panel, preference)"
+            "VALUES "
+            "( ?, ?"
+            ", (SELECT id FROM panels p WHERE p.issue == 4 AND p.page = ? AND p.panel = ?)"
+            ", ?"
+            ")",
+            (now, db_user['id']) + choice + (pref,)
+        )
     conn.commit()
 
     worker.async_allocate()
@@ -162,7 +189,7 @@ def queue():
         ", pc.page as pc_page"
         ", pc.panel as pc_panel"
         " FROM choices c "
-        " LEFT JOIN users u ON c.from_user=u.id"
+        " LEFT JOIN users u ON c.user=u.id"
         " LEFT JOIN panels p1 ON p1.id=c.first_choice "
         " LEFT JOIN panels p2 ON p2.id=c.second_choice "
         " LEFT JOIN panels p3 ON p3.id=c.third_choice "

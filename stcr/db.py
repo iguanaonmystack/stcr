@@ -10,13 +10,16 @@ def get_or_create_user(conn, discord_user):
     while db_user is None:
         db_user = conn.execute(
                 'SELECT u.* '
-                ', pc.page as pc_page'
-                ', pc.panel as pc_panel'
-                ', c.status as status'
+                ', al.id as aid'
+                ', al.created as acreated'
+                ', pa.issue as a_issue'
+                ', pa.page as a_page'
+                ', pa.panel as a_panel'
                 ' FROM users u '
-                '  LEFT JOIN panels pc ON pc.id = u.confirmed_choice AND pc.issue = 4 '
-                '  LEFT JOIN choices c ON c.from_user = u.id AND c.status = "PENDING" '
+                '  LEFT JOIN allocations al ON al.user = u.id'
+                '  LEFT JOIN panels pa ON pa.id = al.panel AND pa.issue = 4 '
                 ' WHERE discord_username = (?)'
+                ' ORDER BY acreated DESC'
                 , (discord_user.name,)).fetchone()
         if db_user is None:
             db_user = conn.execute(
