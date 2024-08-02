@@ -5,7 +5,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_or_create_user(conn, discord_user):
+def get_or_create_user(conn, discord_username):
     db_user = None
     while db_user is None:
         db_user = conn.execute(
@@ -20,10 +20,10 @@ def get_or_create_user(conn, discord_user):
                 '  LEFT JOIN panels pa ON pa.id = al.panel AND pa.issue = 4 '
                 ' WHERE discord_username = (?)'
                 ' ORDER BY acreated DESC'
-                , (discord_user.name,)).fetchone()
+                , (discord_username,)).fetchone()
         if db_user is None:
             db_user = conn.execute(
                 'INSERT INTO users (discord_user, is_admin) VALUES (?,?)',
-                (discord_user.name, False))
+                (discord_username, False))
     return db_user
 

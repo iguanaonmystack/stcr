@@ -17,28 +17,34 @@
 
 	<table style="width:100%;">
 		<thead>
-			<th>Submitted at</th>
 			<th>User</th>
-			<th>Choice</th>
-			<th>Preference</th>
+			<th>Created here</th>
+			<th>Admin</th>
+			<th>Issue</th>
+			<th>Page and Panel</th>
 		</thead>
 		<tbody>
-	{% for item in choices %}
+	{% for user in users %}
 	<tr style="
-	       {% if item.status == "PENDING" %}
+	       {% if user.status == "PENDING" %}
 		background-color: #f0f0f0;
 	       {%else%}
 		background-color: #f0fff0;
 	       {%endif%}"
 	>
-		<td>{{item.created}}</td>
-		<td>{{item.u_discord_username}}</td>
-		{% if item.p_issue %}
-		<td>Issue {{item.p_issue}}, {{item.p_page}}-{{item.p_panel}}</td>
-		{%else%}
-		<td>-</td>
-		{%endif%}
-		<td>{{item.preference}}</td>
+	<td>{{users[user].discord_username}}</td>
+	<td>{{users[user].created}}</td>
+	<td>{{users[user].admin and 'Y' or 'N'}}</td>
+	<td>{{users[user].a_issue}}</td>
+	{% if users[user].aid %}
+	<td>{{users[user].a_page}}-{{users[user].a_panel}}</td>
+	{% else %}
+		<td>None</td>
+	{%endif %}
+	<td>
+		<form method="POST" action="{{url_for('.return_panel')}}"><input type="Submit" value="Return panel"><input type="hidden" name="user" value="{{users[user].id}}" /><input type="hidden" name="issue" value="{{users[user].a_issue}}" /></form>
+	</td>
+
 	</tr>
 	{%endfor%}
 		</tbody>

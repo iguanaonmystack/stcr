@@ -28,7 +28,7 @@ rq_dashboard.web.setup_rq_connection(app)
 def dashboard_auth():
     discord_user = discord.fetch_user()
     conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user)
+    db_user = db.get_or_create_user(conn, discord_user.name)
     if not db_user['is_admin']:
         return "Admin user login required."
 
@@ -79,7 +79,7 @@ def me():
     discord_user = discord.fetch_user()
 
     conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user)
+    db_user = db.get_or_create_user(conn, discord_user.name)
     status = 'ALLOCATED'
     if db_user['a_panel'] is None:
         if db_user['aid'] is not None:
@@ -114,7 +114,27 @@ def me():
             db_user=db_user)
 
 
-@app.route("/choose", methods=('POST',))
+@app.route("/return", methods=('post',))
+@requires_authorization
+def return_panel():
+    """Return a user's panel choice"""
+    # internally, add a NULL allocation.
+
+    discord_user = discord.fetch_user()
+    conn = db.get_db_connection()
+    db_user = db.get_or_create_user(conn, discord_user.name)
+    if not db_user['is_admin']:
+        return "Admin user login required."
+
+    conn.execute(
+        "INSERT INTO allocations (user, panel) VALUES ((?), NULL)",
+        (request.form['user'],)
+    )
+    conn.commit()
+
+    return "OK"
+
+@app.route("/choose", methods=('post',))
 @requires_authorization
 def choose():
     """Store the user's panel choices.
@@ -123,7 +143,7 @@ def choose():
     discord_user = discord.fetch_user()
 
     conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user)
+    db_user = db.get_or_create_user(conn, discord_user.name)
 
     choices = {}
     choices[1] = tuple(map(int, (request.form['first_choice'] or '0-0').split('-')))
@@ -156,11 +176,33 @@ def choose():
 def add_worker():
     discord_user = discord.fetch_user()
     conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user)
+    db_user = db.get_or_create_user(conn, discord_user.name)
     if not db_user['is_admin']:
         return "Admin user login required."
     worker.async_allocate()
     return "OK"
+
+
+@app.route("/users")
+@requires_authorization
+def users():
+    discord_user = discord.fetch_user()
+    conn = db.get_db_connection()
+    db_user = db.get_or_create_user(conn, discord_user.name)
+    if not db_user['is_admin']:
+        return "Admin user login required."
+
+    user_rows = conn.execute(
+        "SELECT discord_username FROM users"
+    ).fetchall()
+    users = {}
+    for row in user_rows:
+        users[row['discord_username']] = db.get_or_create_user(conn, row['discord_username'])
+
+    return render_template('users.html',
+            discord_user = discord_user,
+            db_user = db_user,
+            users = users)
 
 
 @app.route("/queue")
@@ -168,33 +210,20 @@ def add_worker():
 def queue():
     discord_user = discord.fetch_user()
     conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user)
+    db_user = db.get_or_create_user(conn, discord_user.name)
     if not db_user['is_admin']:
         return "Admin user login required."
 
     choices = conn.execute(
-        "SELECT "
-        "  c.*"
-        ", u.discord_username as discord_username"
-        ", p1.issue as p1_issue"
-        ", p1.page as p1_page"
-        ", p1.panel as p1_panel"
-        ", p2.issue as p2_issue"
-        ", p2.page as p2_page"
-        ", p2.panel as p2_panel"
-        ", p3.issue as p3_issue"
-        ", p3.page as p3_page"
-        ", p3.panel as p3_panel"
-        ", pc.issue as pc_issue"
-        ", pc.page as pc_page"
-        ", pc.panel as pc_panel"
-        " FROM choices c "
-        " LEFT JOIN users u ON c.user=u.id"
-        " LEFT JOIN panels p1 ON p1.id=c.first_choice "
-        " LEFT JOIN panels p2 ON p2.id=c.second_choice "
-        " LEFT JOIN panels p3 ON p3.id=c.third_choice "
-        " LEFT JOIN panels pc ON pc.id=c.confirmed_choice "
-        " ORDER BY created"
+        "select c.*"
+        ", u.discord_username as u_discord_username"
+        ", p.issue as p_issue"
+        ", p.page as p_page"
+        ", p.panel as p_panel"
+        " from choices c"
+        " LEFT JOIN users u ON u.id = c.user"
+        " LEFT JOIN panels p ON p.id = c.panel"
+        " ORDER BY CREATED;"
     ).fetchall()
     return render_template('queue.html',
             discord_user=discord_user,
