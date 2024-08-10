@@ -23,7 +23,7 @@ def get_or_create_user(conn, discord_username):
                 , (discord_username,)).fetchone()
         if db_user is None:
             db_user = conn.execute(
-                'INSERT INTO users (discord_user, is_admin) VALUES (?,?)',
+                'INSERT INTO users (discord_username, is_admin) VALUES (?,?)',
                 (discord_username, False))
     return db_user
 

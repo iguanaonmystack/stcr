@@ -19,7 +19,7 @@
 	<center><img src="https://stcr.nevira.net/assets/stcr-logo.png" style="width: 528px; margin-left: auto; margin-right: auto;" />
 		<h2>Contributors' area</h2></center>
 	<img src='{{discord_user.avatar_url}}' style="float: left; margin: 1ex; border: 1px solid black; width: 3em; height: 3em;" />
-	<p>Logged in using discord as {{discord_user.name}}</p>
+	<p>Logged in using discord as {{discord_user.name}}. <a href="{{url_for('.logout')}}">Log out</a></p>
 
 	{% if status == "ALLOCATED" %}
 	<div class="confirmed">
