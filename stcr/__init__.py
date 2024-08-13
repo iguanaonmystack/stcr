@@ -27,8 +27,8 @@ rq_dashboard.web.setup_rq_connection(app)
 @rq_dashboard.blueprint.before_request
 def dashboard_auth():
     discord_user = discord.fetch_user()
-    conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user.name)
+    with db.db_cursor() as cur:
+        db_user = db.get_or_create_user(cur, discord_user.name)
     if not db_user['is_admin']:
         return "Admin user login required."
 
@@ -46,6 +46,7 @@ app.config["DISCORD_CLIENT_SECRET"] = config['client_secret']                # D
 app.config["DISCORD_REDIRECT_URI"] = "https://stcr.nevira.net/app/auth/discord-redirect"                 # URL to your callback endpoint.
 app.config["DISCORD_BOT_TOKEN"] = ""                    # Required to access BOT resources.
 
+app.config['DB_PW'] = config['db_password']
 
 discord = DiscordOAuth2Session(app)
 
@@ -78,35 +79,36 @@ def redirect_unauthorized(e):
 def me():
     discord_user = discord.fetch_user()
 
-    conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user.name)
-    status = 'ALLOCATED'
-    if db_user['a_panel'] is None:
-        if db_user['aid'] is not None:
-            # they were allocated a NULL panel; ie no panels were available
-            status = 'FAILED'
-        else:
-            # Check if they have pending choices
-            choices = conn.execute(
-                'SELECT c.*, p.page as p_issue FROM choices c '
-                ' LEFT JOIN panels p ON p.id = c.panel'
-                ' WHERE user = (?) AND p_issue != 4',
-                (db_user['id'],)
-            ).fetchall()
-            if choices:
-                status = 'PENDING'
+    with db.db_cursor() as cur:
+        db_user = db.get_or_create_user(cur, discord_user.name)
+        status = 'ALLOCATED'
+        if db_user['a_panel'] is None:
+            if db_user['aid'] is not None:
+                # they were allocated a NULL panel; ie no panels were available
+                status = 'FAILED'
             else:
-                status = 'NEW'
+                # Check if they have pending choices
+                cur.execute(
+                    'SELECT c.*, p.issue as p_issue FROM choices c '
+                    ' LEFT JOIN panels p ON p.id = c.panel'
+                    ' WHERE u = (%s) AND p.issue = 4',
+                    (db_user['id'],)
+                )
+                choices = cur.fetchall()
+                if choices:
+                    status = 'PENDING'
+                else:
+                    status = 'NEW'
 
-    available_panels = conn.execute(
-        "SELECT * FROM panels p "
-        " WHERE issue = 4 "
-        " AND NOT EXISTS ("
-        "    SELECT * FROM allocations a WHERE a.panel == p.id"
-        " )"
-    ).fetchall()
+        cur.execute(
+            "SELECT * FROM panels p "
+            " WHERE issue = 4 "
+            " AND NOT EXISTS ("
+            "    SELECT * FROM allocations a WHERE a.panel = p.id"
+            " )"
+        )
+        available_panels = cur.fetchall()
 
-    conn.close()
     return render_template('me.html',
             available_panels=list(available_panels),
             discord_user=discord_user,
@@ -121,17 +123,15 @@ def return_panel():
     # internally, add a NULL allocation.
 
     discord_user = discord.fetch_user()
-    conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user.name)
-    if not db_user['is_admin']:
-        return "Admin user login required."
+    with db.db_cursor() as cur:
+        db_user = db.get_or_create_user(cur, discord_user.name)
+        if not db_user['is_admin']:
+            return "Admin user login required."
 
-    conn.execute(
-        "INSERT INTO allocations (user, panel) VALUES ((?), NULL)",
-        (request.form['user'],)
-    )
-    conn.commit()
-
+        cur.execute(
+            "INSERT INTO allocations (u, panel) VALUES ((%s), NULL)",
+            (request.form['user'],)
+        )
     return "OK"
 
 @app.route("/choose", methods=('post',))
@@ -142,26 +142,25 @@ def choose():
     The task queue will process whether it's valid or not later."""
     discord_user = discord.fetch_user()
 
-    conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user.name)
+    with db.db_cursor() as cur:
+        db_user = db.get_or_create_user(cur, discord_user.name)
 
-    choices = {}
-    choices[1] = tuple(map(int, (request.form['first_choice'] or '0-0').split('-')))
-    choices[2] = tuple(map(int, (request.form['second_choice'] or '0-0').split('-')))
-    choices[3] = tuple(map(int, (request.form['third_choice'] or '0-0').split('-')))
+        choices = {}
+        choices[1] = tuple(map(int, (request.form['first_choice'] or '0-0').split('-')))
+        choices[2] = tuple(map(int, (request.form['second_choice'] or '0-0').split('-')))
+        choices[3] = tuple(map(int, (request.form['third_choice'] or '0-0').split('-')))
 
-    now = datetime.datetime.now()
-    for pref, choice in choices.items():
-        conn.execute(
-            "INSERT INTO choices (created, user, panel, preference)"
-            "VALUES "
-            "( ?, ?"
-            ", (SELECT id FROM panels p WHERE p.issue == 4 AND p.page = ? AND p.panel = ?)"
-            ", ?"
-            ")",
-            (now, db_user['id']) + choice + (pref,)
-        )
-    conn.commit()
+        now = datetime.datetime.now()
+        for pref, choice in choices.items():
+            cur.execute(
+                "INSERT INTO choices (created, u, panel, preference)"
+                "VALUES "
+                "( %s, %s"
+                ", (SELECT id FROM panels p WHERE p.issue = 4 AND p.page = %s AND p.panel = %s)"
+                ", %s"
+                ")",
+                (now, db_user['id']) + choice + (pref,)
+            )
 
     worker.async_allocate()
 
@@ -175,10 +174,10 @@ def choose():
 @requires_authorization
 def add_worker():
     discord_user = discord.fetch_user()
-    conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user.name)
-    if not db_user['is_admin']:
-        return "Admin user login required."
+    with db.db_cursor() as cur:
+        db_user = db.get_or_create_user(cur, discord_user.name)
+        if not db_user['is_admin']:
+            return "Admin user login required."
     worker.async_allocate()
     return "OK"
 
@@ -187,17 +186,16 @@ def add_worker():
 @requires_authorization
 def users():
     discord_user = discord.fetch_user()
-    conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user.name)
-    if not db_user['is_admin']:
-        return "Admin user login required."
+    with db.db_cursor() as cur:
+        db_user = db.get_or_create_user(cur, discord_user.name)
+        if not db_user['is_admin']:
+            return "Admin user login required."
 
-    user_rows = conn.execute(
-        "SELECT discord_username FROM users"
-    ).fetchall()
-    users = {}
-    for row in user_rows:
-        users[row['discord_username']] = db.get_or_create_user(conn, row['discord_username'])
+        cur.execute("SELECT discord_username FROM users")
+        user_rows = cur.fetchall()
+        users = {}
+        for row in user_rows:
+            users[row['discord_username']] = db.get_or_create_user(cur, row['discord_username'])
 
     return render_template('users.html',
             discord_user = discord_user,
@@ -209,22 +207,23 @@ def users():
 @requires_authorization
 def queue():
     discord_user = discord.fetch_user()
-    conn = db.get_db_connection()
-    db_user = db.get_or_create_user(conn, discord_user.name)
-    if not db_user['is_admin']:
-        return "Admin user login required."
+    with db.db_cursor() as cur:
+        db_user = db.get_or_create_user(cur, discord_user.name)
+        if not db_user['is_admin']:
+            return "Admin user login required."
 
-    choices = conn.execute(
-        "select c.*"
-        ", u.discord_username as u_discord_username"
-        ", p.issue as p_issue"
-        ", p.page as p_page"
-        ", p.panel as p_panel"
-        " from choices c"
-        " LEFT JOIN users u ON u.id = c.user"
-        " LEFT JOIN panels p ON p.id = c.panel"
-        " ORDER BY CREATED;"
-    ).fetchall()
+        cur.execute(
+            "select c.*"
+            ", u.discord_username as u_discord_username"
+            ", p.issue as p_issue"
+            ", p.page as p_page"
+            ", p.panel as p_panel"
+            " from choices c"
+            " LEFT JOIN users u ON u.id = c.u"
+            " LEFT JOIN panels p ON p.id = c.panel"
+            " ORDER BY CREATED;"
+        )
+        choices = cur.fetchall()
     return render_template('queue.html',
             discord_user=discord_user,
             db_user=db_user,

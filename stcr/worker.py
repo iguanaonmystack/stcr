@@ -16,41 +16,46 @@ def async_allocate():
     q.enqueue_call(func=allocate, args=(), result_ttl=5000)
 
 def allocate():
-    conn = db.get_db_connection()
-    
-    pending = conn.execute(
+    with db.db_cursor('STCRDBPW') as cur:
+        return _allocate(cur)
+
+def _allocate(cur):
+    cur.execute(
         # SELECT...
         "SELECT c.* "
         ", u.id as uid"
         ", u.discord_username as discord_username"
         # the latest choices for each user...
         " FROM "
-        "  (SELECT user, MAX(created) AS created FROM choices GROUP BY user) "
+        "  (SELECT u, MAX(created) AS created FROM choices GROUP BY u) "
         "  AS latest_choices"
         " INNER JOIN choices c "
-        "  ON c.user = latest_choices.user"
+        "  ON c.u = latest_choices.u"
         "  AND c.created = latest_choices.created"
         # joined with the users table...
         " LEFT JOIN users u "
-        "  ON u.id = c.user "
+        "  ON u.id = c.u "
         # where the user doesn't have any STC:R 4 allocations yet...
-        "  WHERE c.user NOT IN "
-        "   (SELECT user FROM allocations a LEFT JOIN panels p on p.id = a.panel WHERE p.issue = 4)"
+        "  WHERE c.u NOT IN "
+        "   (SELECT u FROM allocations a LEFT JOIN panels p on p.id = a.panel WHERE p.issue = 4)"
         # ordered by preference 1, then 2, then 3...
         " ORDER BY preference ASC"
-    ).fetchall()
+    )
+    pending = cur.fetchall()
 
     print(list(pending))
     allocated_users = set()
+    debug = "no choices to process"
     for choice in pending:
         debug = "processing " + str(dict(choice))
         print(debug)
         if choice['panel'] is not None:
             # check if this panel is taken (res evals true if so)
-            res = conn.execute(
-                "SELECT user FROM allocations WHERE panel = (?)",
+            cur.execute(
+                "SELECT u FROM allocations WHERE panel = (%s)",
                 (choice['panel'],)
-            ).fetchone()
+            )
+            res = cur.fetchone()
 
             if res:
                 debug = "panel already taken: " + str(dict(res))
@@ -58,8 +63,8 @@ def allocate():
             else:
                 debug = "allocating %s preference for %s" % (choice['preference'], choice['discord_username'])
                 print(debug)
-                conn.execute(
-                    "INSERT INTO allocations (user, panel) VALUES ((?), (?))",
+                cur.execute(
+                    "INSERT INTO allocations (u, panel) VALUES ((%s), (%s))",
                     (choice['uid'], choice['panel'])
                 )
                 allocated_users.add(choice['uid'])
@@ -70,10 +75,9 @@ def allocate():
             debug = "no choices available for %s" % (choice['discord_username'])
             print(debug)
 
-            conn.execute(
-                "INSERT INTO allocations (user, panel) VALUES ((?), NULL)",
+            cur.execute(
+                "INSERT INTO allocations (u, panel) VALUES ((%s), NULL)",
                 (choice['uid'], )
             )
 
-    conn.commit()
     return debug
