@@ -21,10 +21,9 @@
 	<img src='{{discord_user.avatar_url}}' style="float: left; margin: 1ex; border: 1px solid black; width: 3em; height: 3em;" />
 	<p>Logged in using discord as {{discord_user.name}}. <a href="{{url_for('.logout')}}">Log out</a></p>
 	{% if db_user.is_admin %}
-	<p>Admin tools: <a href="{{url_for('.queue')}}">All user choices history</a> | <a href="{{url_for('.users')}}">User/panel list</a></p>
+	<p>Admin tools: <a href="{{url_for('.queue')}}">Choice & Allocation History</a> | <a href="{{url_for('.users')}}">User/panel list</a></p>
 	{% endif %}
 
-	{{dict(db_user)}}
 	{% if status == "ALLOCATED" %}
 	<div class="confirmed">
 		<p>You have been allocated Page {{db_user.a_page}}, Panel {{db_user.a_panel}}!</p>

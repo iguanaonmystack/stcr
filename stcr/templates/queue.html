@@ -11,19 +11,20 @@
 	<img src='{{discord_user.avatar_url}}' />
 	<p>Logged in as {{discord_user.name}}</p>
 
-	<h2>Admin Choices History View</h2>
+	<h2>Choices and Allocations History View</h2>
 
 	<table style="width:100%;">
 		<thead>
-			<th>Submitted at</th>
+			<th>Time</th>
 			<th>User</th>
-			<th>Choice</th>
+			<th>Action</th>
+			<th>Choice/Allocated</th>
 			<th>Preference</th>
 		</thead>
 		<tbody>
 	{% for item in choices %}
 	<tr style="
-	       {% if item.status == "PENDING" %}
+	       {% if item.type == "choice" %}
 		background-color: #f0f0f0;
 	       {%else%}
 		background-color: #f0fff0;
@@ -31,12 +32,13 @@
 	>
 		<td>{{item.created}}</td>
 		<td>{{item.u_discord_username}}</td>
+		<td>{{item.type == 'choice' and 'User choice' or 'Panel allocation'}}</td>
 		{% if item.p_issue %}
 		<td>Issue {{item.p_issue}}, {{item.p_page}}-{{item.p_panel}}</td>
 		{%else%}
 		<td>-</td>
 		{%endif%}
-		<td>{{item.preference}}</td>
+		<td>{{item.preference or ''}}</td>
 	</tr>
 	{%endfor%}
 		</tbody>

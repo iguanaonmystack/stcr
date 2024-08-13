@@ -52,7 +52,7 @@ discord = DiscordOAuth2Session(app)
 
 @app.route("/auth/discord-login/")
 def login():
-    return discord.create_session(scope=['identify', 'email'])
+    return discord.create_session(scope=['identify'])
 
 
 @app.route("/auth/discord-redirect")
@@ -106,7 +106,7 @@ def me():
             " AND NOT EXISTS ("
             "    SELECT * FROM allocations a WHERE a.panel = p.id"
             " )"
-        )
+        ) # FIXME - this doesn't account for returned panels.
         available_panels = cur.fetchall()
 
     return render_template('me.html',
@@ -213,16 +213,21 @@ def queue():
             return "Admin user login required."
 
         cur.execute(
-            "select c.*"
-            ", u.discord_username as u_discord_username"
-            ", p.issue as p_issue"
-            ", p.page as p_page"
-            ", p.panel as p_panel"
-            " from choices c"
-            " LEFT JOIN users u ON u.id = c.u"
-            " LEFT JOIN panels p ON p.id = c.panel"
-            " ORDER BY CREATED;"
-        )
+            """
+            SELECT ca.*
+               , u.discord_username as u_discord_username
+               , p.issue as p_issue
+               , p.page as p_page
+               , p.panel as p_panel 
+            FROM (
+                (select *, 'choice' as type from choices)
+                UNION ALL
+                (select *, NULL as preference, 'allocation' as type from allocations)
+            ) AS ca
+            LEFT JOIN users u ON ca.u = u.id
+            LEFT JOIN panels p ON p.id = ca.panel
+            ORDER BY ca.created;
+            """)
         choices = cur.fetchall()
     return render_template('queue.html',
             discord_user=discord_user,
